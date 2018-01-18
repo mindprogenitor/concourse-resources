@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set -e
+
+payload=$(cat <&0)
+
+CURRENT_VERSION=$(echo $payload | jq -r '.version // ""')
+
+if [[ -z "$CURRENT_VERSION" ]]; then
+   CURRENT_VERSION="{\"timestamp\": \"$(date +%s)\"}"
+fi
+
+echo "[ $CURRENT_VERSION ]"
