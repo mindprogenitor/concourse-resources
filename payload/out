@@ -6,7 +6,8 @@ payload=$(cat <&0)
 
 echo "payload is: $payload" >&2
 
-ls >&2
+pwd 1>&2
+ls -la 1>&2
 
 PAYLOADS=$(echo $payload | jq -r '.params.payloads // ""')
 if [ -z "$PAYLOADS" ]; then
