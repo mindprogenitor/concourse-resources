@@ -7,7 +7,7 @@ payload=$(cat <&0)
 echo "payload is: $payload" >&2
 
 pwd 1>&2
-ls -la 1>&2
+ls -la $1 1>&2
 
 PAYLOADS=$(echo $payload | jq -r '.params.payloads // ""')
 if [ -z "$PAYLOADS" ]; then
@@ -23,7 +23,7 @@ echo \"$PAYLOADS\" >&2
 echo $PAYLOADS | jq -r '.[]' >&2
 
 for content in $(echo $PAYLOADS | jq -r '.[]'); do
-  cp -R $content /tmp/payload
+  cp -R $1/$content /tmp/payload
 done
 
 
