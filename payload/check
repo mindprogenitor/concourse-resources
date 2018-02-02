@@ -1,0 +1,23 @@
+#!/bin/bash
+# A bit clumsy.... improve it!
+
+set -e
+
+if [ -d "/tmp/payload" ]; then
+  if [ "$(ls -A /tmp/payload/)" ]; then
+    payload=$(cat <&0)
+
+    CURRENT_VERSION=$(echo $payload | jq -r '.version // ""')
+
+    if [[ -z "$CURRENT_VERSION" ]]; then
+       CURRENT_VERSION="{\"timestamp\": \"$(date +%s)\"}"
+    fi
+
+    echo "[ $CURRENT_VERSION ]"
+
+  else
+    echo "[]"
+  fi
+else
+  echo "[]"
+fi

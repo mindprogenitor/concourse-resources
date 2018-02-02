@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+set -e
+
+payload=$(cat <&0)
+
+CURRENT_VERSION=$(echo $payload | jq -r '.version // ""')
+
+if [[ -z "$CURRENT_VERSION" ]]; then
+   echo "NO VERSION TO GET!!" >&2
+   exit 1
+fi
+
+if [ ! -d "/tmp/payload" ]; then
+  echo "NO PAYLOAD AVAILABLE!!" >&2
+  exit 1
+fi
+
+cp -R /tmp/payload/* $1
+
+echo "{\"version\" : $CURRENT_VERSION, \"metadata\" : [] }"

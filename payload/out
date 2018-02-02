@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+set -e
+
+payload=$(cat <&0)
+
+echo "payload is: $payload"
+
+PAYLOADS=$(echo $payload | jq -r '.params.payloads // ""')
+if [ -z "$PAYLOADS" ]; then
+  PAYLOADS='["*"]'
+fi
+
+if [ ! -d "/tmp/payload" ]; then
+  mkdir /tmp/payload
+fi
+
+echo \"$PAYLOADS\"
+
+for content in $(echo $PAYLOADS | jq -r '.[]'); do
+  cp -R $content /tmp/payload
+done
+
+
+echo "{\"version\" : {\"timestamp\": \"$(date +%s)\"}, \"metadata\" : [] }"
