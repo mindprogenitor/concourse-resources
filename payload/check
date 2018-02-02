@@ -6,6 +6,8 @@ set -e
 if [ -d "/tmp/payload" ]; then
   if [ "$(ls -A /tmp/payload/)" ]; then
     payload=$(cat <&0)
+ 
+    echo "payload: $payload" >&2
 
     CURRENT_VERSION=$(echo $payload | jq -r '.version // ""')
 
