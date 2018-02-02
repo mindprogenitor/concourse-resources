@@ -4,7 +4,9 @@ set -e
 
 payload=$(cat <&0)
 
-echo "payload is: $payload"
+echo "payload is: $payload" >&2
+
+ls >&2
 
 PAYLOADS=$(echo $payload | jq -r '.params.payloads // ""')
 if [ -z "$PAYLOADS" ]; then
@@ -15,7 +17,9 @@ if [ ! -d "/tmp/payload" ]; then
   mkdir /tmp/payload
 fi
 
-echo \"$PAYLOADS\"
+echo \"$PAYLOADS\" >&2
+
+echo $PAYLOADS | jq -r '.[]' >&2
 
 for content in $(echo $PAYLOADS | jq -r '.[]'); do
   cp -R $content /tmp/payload
