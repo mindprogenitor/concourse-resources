@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+set -e
+
+exec 3>&1 # make stdout available as fd 3 for the result
+exec 1>&2 # redirect all output to stderr for logging
+
+payload=$(cat <&0)
+
+# check if there are credentials at the source level
+USERNAME=$(echo $payload | jq -r '.source.username // ""')
+KEY=$(echo $payload | jq -r '.source.identity // ""')
+
+# overwrite with credentials given at the parameter level
+PARAM_USERNAME=$(echo $payload | jq -r '.params.username // ""')
+if [ ! -z "$PARAM_USERNAME" ]; then
+  USERNAME="$PARAM_USERNAME"
+fi
+
+PARAM_KEY=$(echo $payload | jq -r '.params.identity // ""')
+if [ ! -z "$PARAM_KEY" ]; then
+  KEY="$PARAM_KEY"
+fi
+
+# fail if no credentials are provided
+if [ -z "$USERNAME" ]; then
+  echo "FAILURE! No Username Provided"
+  exit 1
+fi
+
+if [ -z "$KEY" ]; then
+  echo "FAILURE! No Identity Provided"
+  exit 1
+fi
+
+# Check if source is provided and exists
+SOURCE=$(echo $payload | jq -r '.params.source // ""')
+if [ -z "$SOURCE" ]; then
+  echo "No source to copy was given!"
+  exit 1
+fi
+
+HOST=$(echo $payload | jq -r '.params.host // ""')
+if [ -z "$HOST" ]; then
+  echo "no destination host was provided!"
+  exit 1
+fi
+
+# save key locally to use it with scp
+echo $payload | jq -r '.source.identity // ""' > /tmp/id
+chmod 0600 /tmp/id
+
+# copy the file(s)
+scp -i /tmp/id -r -q $USERNAME@$HOST:$SOURCE $1
+
+# delete the key from the container
+rm /tmp/id
+
+echo "{\"version\" : {\"timestamp\": \"$(date +%s)\"}, \"metadata\" : [] }" >&3
