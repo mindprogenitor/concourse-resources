@@ -10,6 +10,7 @@ payload=$(cat <&0)
 # check if there are credentials at the source level
 USERNAME=$(echo $payload | jq -r '.source.username // ""')
 KEY=$(echo $payload | jq -r '.source.identity // ""')
+HOST=$(echo $payload | jq -r '.source.host // ""')
 
 # overwrite with credentials given at the parameter level
 PARAM_USERNAME=$(echo $payload | jq -r '.params.username // ""')
@@ -46,7 +47,11 @@ if [ ! "$(ls $1/$SOURCE)" ]; then
 fi
 
 # Check that a destination was provided
-HOST=$(echo $payload | jq -r '.params.host // ""')
+PARAM_HOST=$(echo $payload | jq -r '.params.host // ""')
+if [ ! -z "$PARAM_HOST" ]; then
+  HOST=$PARAM_HOST
+fi
+
 if [ -z "$HOST" ]; then
   echo "no destination host was provided!"
   exit 1
