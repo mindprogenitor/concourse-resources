@@ -7,6 +7,8 @@ exec 1>&2 # redirect all output to stderr for logging
 
 payload=$(cat <&0)
 
+echo $payload
+
 # check if there are credentials at the source level
 USERNAME=$(echo $payload | jq -r '.source.username // ""')
 KEY=$(echo $payload | jq -r '.source.identity // ""')
