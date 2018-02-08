@@ -1,6 +1,6 @@
 FROM alpine:edge
 
-RUN apk --no-cache add bash openssh
+RUN apk --no-cache add bash jq openssh
 
 ADD check /opt/resource/check
 ADD in /opt/resource/in
