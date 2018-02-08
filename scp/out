@@ -68,7 +68,7 @@ echo $payload | jq -r '.source.identity // ""' > /tmp/id
 chmod 0600 /tmp/id
 
 # copy the file(s)
-scp -i /tmp/id -r -q $1/$SOURCE $USERNAME@$HOST:$DESTINATION
+scp -i /tmp/id -o StrictHostKeyChecking=no -r -q $1/$SOURCE $USERNAME@$HOST:$DESTINATION
 
 # delete the key from the container
 rm /tmp/id
