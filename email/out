@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+
+set -e
+
+exec 3>&1 # make stdout available as fd 3 for the result
+exec 1>&2 # redirect all output to stderr for logging
+
+payload=$(cat <&0)
+
+# echo $payload
+
+# get information for the smtp server
+SERVER=$(echo $payload | jq -r '.source.server.host // ""')
+if [ -z "$SERVER" ]; then
+  echo "No SMTP Host provided!"
+  exit 1
+fi
+
+PORT=$(echo $payload | jq -r '.source.server.port // ""')
+if [ -z "$PORT" ]; then
+  echo "No SMTP Port defined. Using default port 25."
+  PORT=25
+fi
+
+USERNAME=$(echo $payload | jq -r '.source.server.username // ""')
+PASSWORD=$(echo $payload | jq -r '.source.server.password // ""')
+SMTP_AUTH=""
+if [ -z "$USERNAME" ]; then
+  echo "No SMTP Authentication used"
+else
+  if [ -z "$PASSWORD" ]; then
+    echo "PASSWORD Required if Login Defined!"
+    exit 1
+  fi
+  SMTP_AUTH="-m login -u \"$USERNAME\" -i \"$PASSWORD\""
+fi
+
+TLS=$(echo $payload | jq -r '.source.tls | if (type == "boolean" and .) or (. == "true") then "-tls" else "" end')
+
+# Get default values
+DEFAULT_SENDER=$(echo $payload | jq -r '.source.from // ""')
+DEFAULT_SENDER_NAME=$(echo $payload | jq -r '.source.from_name // ""')
+DEFAULT_RECIPIENT=$(echo $payload | jq -r '.source.to | if type == "array" then (. | join(",")) else . end // ""')
+DEFAULT_MESSAGE=$(echo $payload | jq -r '.source.message // ""')
+DEFAULT_SUBJECT=$(echo $payload | jq -r '.source.subject // ""')
+DEFAULT_CC=$(echo $payload | jq -r '.source.cc | if type == "array" then (. | join(",")) else . end // ""')
+DEFAULT_BCC=$(echo $payload | jq -r '.source.bcc | if type == "array" then (. | join(",")) else . end // ""')
+DEFAULT_PRIORITY=$(echo $payload | jq -r '.source.priority | if (type == "boolean" and .) or (. == "true") then "-high-priority" else "" end')
+DEFAULT_FILE=$(echo $payload | jq -r '.source.attachment // ""')
+
+function send_mail() {
+
+  SENDER=$(echo $1 | jq -r '.from // ""')
+  if [ -z "$SENDER" ]; then
+    SENDER=$DEFAULT_SENDER
+  fi
+  if [ -z "$SENDER" ]; then
+    echo "Message Requires a sender!"
+    exit 1
+  fi
+
+  SENDER_NAME=$(echo $1 | jq -r '.from_name // ""')
+  if [ -z "$SENDER_NAME" ]; then
+    SENDER_NAME="$DEFAULT_SENDER_NAME"
+  fi
+  SENDER_NAME="-from-name \"$SENDER_NAME\""
+ 
+  SUBJECT=$(echo $1 | jq -r '.subject // ""')
+  if [ -z "$SUBJECT" ]; then
+    SUBJECT="$DEFAULT_SUBJECT"
+  fi
+  if [ -z "$SUBJECT" ]; then
+    echo "Cannot send empty subject!"
+    exit 1
+  fi
+
+  FILE=$(echo $1 | jq -r '.attachment // ""')
+  if [ -z "$FILE" ]; then
+    FILE="$DEFAULT_FILE"
+  fi
+  if [ ! -z "$FILE" ]; then
+    FILE="-a $FILE"
+  fi
+
+  CC=$(echo $1 | jq -r '.cc | if type == "array" then (. | join(",")) else . end // ""')
+  if [[ -z "$CC" && ! -z ${DEFAULT_CC+x} ]]; then
+    CC=$DEFAULT_CC
+  fi
+  if [ ! -z "$CC" ]; then
+    CC="-cc $CC"
+  fi
+
+  BCC=$(echo $1 | jq -r '.bcc | if type == "array" then (. | join(",")) else . end // ""')
+  if [[ -z "$BCC" && ! -z ${DEFAULT_BCC+x} ]]; then
+    BCC=$DEFAULT_BCC
+  fi
+  if [ ! -z "$BCC" ]; then
+    BCC="-bcc $BCC"
+  fi 
+
+  RECIPIENT=$(echo $1 | jq -r '.to | if type == "array" then (. | join(",")) else . end // ""')
+  if [ -z "$RECIPIENT" ]; then
+    RECIPIENT=$DEFAULT_RECIPIENT
+  fi
+  if [ -z "$RECIPIENT" ]; then
+    echo "Email Requires Recipients!"
+    exit 1
+  fi
+
+  MESSAGE=$(echo $1 | jq -r '.message // ""')
+  if [ -z "$MESSAGE" ]; then
+    MESSAGE="$DEFAULT_MESSAGE"
+  fi
+
+  echo $MESSAGE | email $SMTP_AUTH -r $SERVER -p $PORT -b -f $SENDER $SENDER_NAME -s "$SUBJECT" $FILE $CC $BCC $TLS $PRIORITY $RECIPIENT
+}
+
+# Check if it's a batch process or not
+BATCH_INSTRUCTIONS=$(echo $payload | jq -r '.params.batch_file // ""')
+if [ ! -z "$BATCH_INSTRUCTIONS" ]; then
+  # process batch
+  SENDER=$(echo $payload | jq -r '.params.from // ""')
+  if [ ! -z "$SENDER" ]; then
+    DEFAULT_SENDER="$SENDER"
+  fi
+
+  SENDER_NAME=$(echo $payload | jq -r '.params.from_name // ""')
+  if [ ! -z "$SENDER_NAME" ]; then
+    DEFAULT_SENDER_NAME="$SENDER_NAME"
+  fi;
+
+  SUBJECT=$(echo $payload | jq -r '.params.subject // ""')
+  if [ ! -z "$SUBJECT" ]; then
+    DEFAULT_SUBJECT="$SUBJECT"
+  fi
+
+  FILE=$(echo $payload | jq -r '.params.attachment // ""')
+  if [ ! -z "$FILE" ]; then
+    DEFAULT_FILE="$FILE"
+  fi
+
+  CC=$(echo $payload | jq -r '.params.cc | if type == "array" then (. | join(",")) else . end // ""')
+  if [ ! -z "$CC" ]; then
+    DEFAULT_CC=$CC
+  fi
+  
+  BCC=$(echo $payload | jq -r '.params.bcc | if type == "array" then (. | join(",")) else . end // ""')
+  if [ ! -z "$BCC" ]; then
+    DEFAULT_BCC=$BCC
+  fi
+
+  RECIPIENT=$(echo $payload | jq -r '.params.to | if type == "array" then (. | join(",")) else . end // ""')
+  if [ ! -z "$RECIPIENT" ]; then
+    DEFAULT_RECIPIENT="$RECIPIENT"
+  fi
+
+  for batch in $(cat $BATCH_INSTRUCTIONS | jq -c '.[] | @base64'); do
+    send_mail "$(echo $batch | base64 -d)"
+  done
+else
+  # single run
+  send_mail "$(echo $payload | jq -c '.params')"
+fi
+
+echo "{\"version\" : {\"timestamp\": \"$(date +%s)\"}, \"metadata\" : [] }" >&3
