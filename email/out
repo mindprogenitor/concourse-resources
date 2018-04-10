@@ -41,8 +41,8 @@ TLS=$(echo $payload | jq -r '.source.tls | if (type == "boolean" and .) or (. ==
 DEFAULT_SENDER=$(echo $payload | jq -r '.source.from // ""')
 DEFAULT_SENDER_NAME=$(echo $payload | jq -r '.source.from_name // ""')
 DEFAULT_RECIPIENT=$(echo $payload | jq -r '.source.to | if type == "array" then (. | join(",")) else . end // ""')
-DEFAULT_MESSAGE=$(echo $payload | jq -r '.source.message // ""')
-DEFAULT_SUBJECT=$(echo $payload | jq -r '.source.subject // ""')
+DEFAULT_MESSAGE=$(echo $payload | jq -r 'if .source.message == null then .source.body_text else .source.message end // ""')
+DEFAULT_SUBJECT=$(echo $payload | jq -r 'if .source.subject == null then .source.subject_text else .source.subject end // ""')
 DEFAULT_CC=$(echo $payload | jq -r '.source.cc | if type == "array" then (. | join(",")) else . end // ""')
 DEFAULT_BCC=$(echo $payload | jq -r '.source.bcc | if type == "array" then (. | join(",")) else . end // ""')
 DEFAULT_PRIORITY=$(echo $payload | jq -r '.source.priority | if (type == "boolean" and .) or (. == "true") then "-high-priority" else "" end')
@@ -65,7 +65,7 @@ function send_mail() {
   fi
   SENDER_NAME="-from-name \"$SENDER_NAME\""
  
-  SUBJECT=$(echo $1 | jq -r '.subject // ""')
+  SUBJECT=$(echo $1 | jq -r 'if .subject == null then .subject_text else .subject end // ""')
   if [ -z "$SUBJECT" ]; then
     SUBJECT="$DEFAULT_SUBJECT"
   fi
@@ -107,12 +107,12 @@ function send_mail() {
     exit 1
   fi
 
-  MESSAGE=$(echo $1 | jq -r '.message // ""')
+  MESSAGE=$(echo $1 | jq -r 'if .message == null then .body_text else .message end // ""')
   if [ -z "$MESSAGE" ]; then
     MESSAGE="$DEFAULT_MESSAGE"
   fi
 
-  echo $MESSAGE | email $SMTP_AUTH -r $SERVER -p $PORT -b -f $SENDER $SENDER_NAME -s "$SUBJECT" $FILE $CC $BCC $TLS $PRIORITY $RECIPIENT
+  echo $(eval "echo $MESSAGE") | email $SMTP_AUTH -r $SERVER -p $PORT -b -f $SENDER $SENDER_NAME -s "$( eval "echo $SUBJECT") $FILE $CC $BCC $TLS $PRIORITY $RECIPIENT
 }
 
 # Check if it's a batch process or not
@@ -129,7 +129,7 @@ if [ ! -z "$BATCH_INSTRUCTIONS" ]; then
     DEFAULT_SENDER_NAME="$SENDER_NAME"
   fi;
 
-  SUBJECT=$(echo $payload | jq -r '.params.subject // ""')
+  SUBJECT=$(echo $payload | jq -r 'if .params.subject == null then .params.subject_text else .params.subject end // ""')
   if [ ! -z "$SUBJECT" ]; then
     DEFAULT_SUBJECT="$SUBJECT"
   fi
@@ -154,7 +154,7 @@ if [ ! -z "$BATCH_INSTRUCTIONS" ]; then
     DEFAULT_RECIPIENT="$RECIPIENT"
   fi
 
-  for batch in $(cat $BATCH_INSTRUCTIONS | jq -c '.[] | @base64'); do
+  for batch in $(cat $1/$BATCH_INSTRUCTIONS | jq -c '.[] | @base64'); do
     send_mail "$(echo $batch | base64 -d)"
   done
 else
