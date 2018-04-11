@@ -48,7 +48,7 @@ fi
 
 TLS=$(echo $payload | jq -r '.source.tls | if (type == "boolean" and .) or (. == "true") then "-tls" else "" end')
 
-CC_AS_RECIPIENT=$(echo $payload | jq -r '.source.cc_as_recipient // ""')
+DEFAULT_CC_AS_RECIPIENT=$(echo $payload | jq -r '.source.cc_as_recipient // ""')
 
 # Get default values
 DEFAULT_SENDER=$(echo $payload | jq -r '.source.from // ""')
@@ -185,6 +185,11 @@ if [ ! -z "$BATCH_INSTRUCTIONS" ]; then
   RECIPIENT=$(echo $payload | jq -r '.params.to | if type == "array" then (. | join(",")) else . end // ""')
   if [ ! -z "$RECIPIENT" ]; then
     DEFAULT_RECIPIENT="$RECIPIENT"
+  fi
+
+  CC_AS_RECIPIENT=$(echo $payload | jq -r '.params.cc_as_recipient // ""')
+  if [ -z "$CC_AS_RECIPIENT" ]; then
+    CC_AS_RECIPIENT=$DEFAULT_CC_AS_RECIPIENT
   fi
 
   for batch in $(cat $1/$BATCH_INSTRUCTIONS | jq -c '.[] | @base64'); do
