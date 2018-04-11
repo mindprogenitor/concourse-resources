@@ -112,7 +112,7 @@ function send_mail() {
     MESSAGE="$DEFAULT_MESSAGE"
   fi
 
-  echo $(eval "echo $MESSAGE") | email $SMTP_AUTH -r $SERVER -p $PORT -b -f $SENDER $SENDER_NAME -s "$( eval "echo $SUBJECT") $FILE $CC $BCC $TLS $PRIORITY $RECIPIENT
+  echo $(eval "echo -e \"$MESSAGE\"") | email $SMTP_AUTH -r $SERVER -p $PORT -b -f $SENDER $SENDER_NAME -s "$(eval "echo $SUBJECT")" $FILE $CC $BCC $TLS $PRIORITY $RECIPIENT
 }
 
 # Check if it's a batch process or not
