@@ -7,7 +7,18 @@ exec 1>&2 # redirect all output to stderr for logging
 
 payload=$(cat <&0)
 
-# echo $payload
+# check if it should skip
+SKIP=$(echo $payload | jq -r '.source.skip // ""')
+if [ "$SKIP" == "true" ]; then
+  echo skipping email
+  exit 0
+fi
+SKIP=$(echo $payload | jq -r '.params.skip // ""')
+if [ "$SKIP" == "true" ]; then
+  echo skipping email
+  exit 0
+fi
+
 
 # get information for the smtp server
 SERVER=$(echo $payload | jq -r '.source.server.host // ""')
@@ -37,6 +48,8 @@ fi
 
 TLS=$(echo $payload | jq -r '.source.tls | if (type == "boolean" and .) or (. == "true") then "-tls" else "" end')
 
+CC_AS_RECIPIENT=$(echo $payload | jq -r '.source.cc_as_recipient // ""')
+
 # Get default values
 DEFAULT_SENDER=$(echo $payload | jq -r '.source.from // ""')
 DEFAULT_SENDER_NAME=$(echo $payload | jq -r '.source.from_name // ""')
@@ -49,6 +62,12 @@ DEFAULT_PRIORITY=$(echo $payload | jq -r '.source.priority | if (type == "boolea
 DEFAULT_FILE=$(echo $payload | jq -r '.source.attachment // ""')
 
 function send_mail() {
+
+  SKIP=$(echo $1 | jq -r '.skip // ""')
+  if [ "$SKIP" == "true" ]; then
+    echo skipping message
+    exit 0
+  fi
 
   SENDER=$(echo $1 | jq -r '.from // ""')
   if [ -z "$SENDER" ]; then
@@ -102,6 +121,20 @@ function send_mail() {
   if [ -z "$RECIPIENT" ]; then
     RECIPIENT=$DEFAULT_RECIPIENT
   fi
+
+  CC=$(echo $1 | jq -r '.cc | if type == "array" then (. | join(",")) else . end // ""')
+  if [[ -z "$CC" && ! -z ${DEFAULT_CC+x} ]]; then
+    CC=$DEFAULT_CC
+  fi
+  
+  if [ "$CC_AS_RECIPIENT" == "true" ]; then
+    if [ ! -z "$CC" ]; then
+      CC="-cc $CC"
+    fi
+  else
+    RECIPIENT=$CC
+  fi
+
   if [ -z "$RECIPIENT" ]; then
     echo "Email Requires Recipients!"
     exit 1
